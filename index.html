@@ -104,8 +104,11 @@ details{margin-top:14px}summary{cursor:pointer;color:var(--acc);font-size:14px;p
       <option value='"Montserrat","Segoe UI",Arial,sans-serif'>Montserrat</option>
      </select></div>
    </div>
-   <label for="scale">Text size: <span id="sv">100</span>%</label>
+   <label for="scale">Title size: <span id="sv">100</span>%</label>
    <input type="range" id="scale" min="60" max="160" value="100">
+   <label for="pscale">Post text size: <span id="pv">100</span>%</label>
+   <input type="range" id="pscale" min="70" max="200" value="100">
+   <label class="chk"><input type="checkbox" id="auto" checked> Auto-shrink image frame to keep post text big and readable</label>
    <label class="chk"><input type="checkbox" id="bul" checked> Show dots when body has 3+ lines</label>
    <label class="chk"><input type="checkbox" id="bord" checked> Light border around the image</label>
   </div>
@@ -116,6 +119,7 @@ details{margin-top:14px}summary{cursor:pointer;color:var(--acc);font-size:14px;p
   <div class="btns">
    <button class="btn" id="dpng">Download PNG</button>
    <button class="btn alt" id="djpg">Download JPG</button>
+   <button class="btn alt" id="rstall" type="button" style="grid-column:1/-1">Reset all (back to default)</button>
   </div>
   <p class="hint">Text auto-fits the image. Edit fields on the left to see changes live.</p>
  </div>
@@ -202,7 +206,7 @@ Block 2: a separate code block containing ONE image-generation prompt for Google
 IMAGE STYLE (for Block 2):
 - Style: American webtoon / Western comic semi-realistic illustration (not manga, not Korean webtoon). Clean linework, soft cel-shading, polished modern comic-book look. Warm, intimate lighting that softens skin tones and sets a calm emotional mood.
 - Aspect ratio: square 1:1.
-- Scene: show the specific moment from the Title and Post (for example someone staring at a phone at night). Adults of any gender, fitting any relationship type, natural body proportions, everyday modest clothing, expressive faces and body language that carry the emotion.
+- Scene: show the specific moment from the Title and Post (for example someone staring at a phone at night). Adults of any gender, fitting any relationship type, natural body proportions, everyday modest clothing with high, fully covered necklines (no cleavage, no tight or revealing outfits), expressive faces and body language that carry the emotion.
 - Composition: keep the main subject centred with breathing room around the edges, because the image will later be cropped into a wide frame.
 - The image must contain no text, letters, numbers, logos, watermarks, speech bubbles or captions. Nothing sexualised.
 - If I say I will attach a reference image, begin the image prompt with: "Same people and same setting. Keep the exact same pose, do not change it." and then restyle it as above.
@@ -213,6 +217,7 @@ const cv=$('cv'),ctx=cv.getContext('2d');
 /* ---- Android app (Capacitor) helpers: harmless in a normal browser ---- */
 const NATIVE=!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform());
 const PL=n=>(window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins[n])||null;
+const DEF={};['raw','imgp','title','post','handle','zoom','fh','rad','hs','align','size','font','scale'].forEach(id=>{DEF[id]=$(id).value});
 function openExt(u){const B=NATIVE&&PL('Browser');if(B)B.open({url:u});else window.open(u,'_blank')}
 async function shareFile(data,name,title,enc){
  try{
@@ -278,13 +283,13 @@ function draw(exp){
  const [W,H]=$('size').value.split('x').map(Number);cv.width=W;cv.height=H;
  const b1=$('b1').value,b2=$('b2').value,tc=$('tc').value,hc=$('hc').value;
  const marker=$('hs').value==='marker',font=$('font').value,m=$('scale').value/100;
- $('sv').textContent=$('scale').value;$('zv').textContent=Math.round(zm*100);$('zoom').value=Math.round(zm*100);
+ $('sv').textContent=$('scale').value;$('pv').textContent=$('pscale').value;$('zv').textContent=Math.round(zm*100);$('zoom').value=Math.round(zm*100);
  const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,b1);g.addColorStop(1,b2);
  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
  const handle=$('handle').value.trim(),pad=Math.round(Math.min(W,H)*0.05);
  const footer=handle?Math.round(H*0.06):0,avail=H-2*pad-footer;
- const hasFrame=!!im||!exp,fgap=Math.round(H*0.025),fh=hasFrame?Math.round(H*$('fh').value/100):0;
- const extra=hasFrame?fh+fgap*1.5:0,availT=avail-extra;
+ const hasFrame=!!im||!exp,fgap=Math.round(H*0.025);
+ let fh=0,extra=0,availT=0;
  const pl=$('post').value.split('\n').map(s=>s.trim()).filter(Boolean);
  const bullets=$('bul').checked&&pl.length>=3;
  const align=bullets?'left':$('align').value;
@@ -299,11 +304,21 @@ function draw(exp){
   const mid=ts*0.55;
   return{tl,tlh,paras,plh,gap,ind,mid,total:tl.length*tlh+mid+ph,ts,ps};
  };
- let L;
- for(let ts=Math.round(190*m);ts>=30;ts-=3){
-  const ps=Math.max(30,Math.min(88*m,ts*0.62));
-  L=lay(ts,ps);if(L.total<=availT)break;
- }
+ const pm=$('pscale').value/100,k=W/1080;
+ const psTarget=Math.round(52*pm*k),psCap=Math.round(78*pm*k),tsCap=Math.round(170*m*k);
+ const solve=()=>{
+  fh=hasFrame?Math.round(H*fhPct/100):0;extra=hasFrame?fh+fgap*1.5:0;availT=avail-extra;
+  let l;
+  for(let ts=tsCap;ts>=30;ts-=3){
+   const ps=Math.max(28,Math.min(psCap,ts*0.68));
+   l=lay(ts,ps);if(l.total<=availT){l.fits=true;return l}
+  }
+  l.fits=false;return l;
+ };
+ let fhPct=+$('fh').value;
+ const minPct=($('auto').checked&&hasFrame)?Math.min(fhPct,24):fhPct;
+ let L=solve();
+ while(fhPct>minPct&&(!L.fits||L.ps<psTarget)){fhPct=Math.max(minPct,fhPct-2);L=solve()}
  let y=pad+(avail-L.total-extra)/2;
  const place=(w)=>align==='center'?(W-w)/2:pad;
  ctx.font=`700 ${L.ts}px ${font}`;
@@ -347,7 +362,7 @@ function dl(type,ext){
  draw();
 }
 $('raw').addEventListener('input',e=>{parseRaw(e.target.value);draw()});
-['title','post','handle','b1','b2','tc','hc','hs','align','size','font','scale','bul','bord','fh','rad'].forEach(id=>$(id).addEventListener('input',draw));
+['title','post','handle','b1','b2','tc','hc','hs','align','size','font','scale','pscale','auto','bul','bord','fh','rad'].forEach(id=>$(id).addEventListener('input',draw));
 const hitEl=$('hit'),pts=new Map();let tap=null,lastD=0;
 const cs=()=>cv.width/cv.getBoundingClientRect().width;
 const dist=()=>{const a=[...pts.values()];return Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)};
@@ -422,6 +437,23 @@ $('cpimg').onclick=()=>{toast(copyText($('imgp').value)?'Image prompt copied.':'
 $('gemimg').onclick=()=>{const c=copyText($('imgp').value);openExt(APPS.gemini.u);toast((c?'Image prompt copied. ':'')+'Opening Gemini. Paste it there.')};
 $('dpng').onclick=()=>dl('image/png','png');
 $('djpg').onclick=()=>dl('image/jpeg','jpg');
+function resetAll(){
+ if(!confirm('Reset everything? Text, image and all settings will go back to default.'))return;
+ Object.keys(DEF).forEach(id=>{$(id).value=DEF[id]});
+ $('bul').checked=true;$('bord').checked=true;
+ im=null;zm=1;px=0;py=0;
+ $('ref').value='';
+ if(confirm('Also reset Page focus, Avoid topics list and your saved prompt to original?\n\nOK = reset them too\nCancel = keep them')){
+  const f='psychology of relationships and dating';
+  $('ptpl').value=ORIG;ls.s('fbpm_prompt',ORIG);
+  $('pfocus').value=f;ls.s('fbpm_focus',f);
+  $('avoid').value='';ls.s('fbpm_avoid','');
+ }
+ applyTheme(THEMES[0]);
+ window.scrollTo(0,0);
+ toast('Reset done. Everything is back to default.');
+}
+$('rstall').onclick=resetAll;
 applyTheme(THEMES[0]);
 if(document.fonts){['700 40px Roboto','500 40px Roboto','700 40px Poppins','500 40px Poppins','700 40px Montserrat','500 40px Montserrat'].forEach(f=>document.fonts.load(f).then(draw).catch(()=>{}))}
 </script>
