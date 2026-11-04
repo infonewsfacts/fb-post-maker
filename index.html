@@ -35,6 +35,8 @@ details{margin-top:14px}summary{cursor:pointer;color:var(--acc);font-size:14px;p
 #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:90%;background:#f1f3f7;color:#14161b;padding:10px 14px;border-radius:8px;font-size:13px;display:none;z-index:9}
 .stage{position:relative}
 #hit{position:absolute;touch-action:none;cursor:grab;display:none}
+#rz{position:absolute;left:50%;width:96px;height:44px;transform:translate(-50%,-50%);display:none;align-items:center;justify-content:center;touch-action:none;cursor:ns-resize;z-index:3}
+#rz span{display:block;width:52px;height:12px;border-radius:8px;background:var(--acc);border:2px solid #14161b;box-shadow:0 1px 6px rgba(0,0,0,.55)}
 .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .btn{border:0;border-radius:8px;padding:12px;font:inherit;font-weight:600;cursor:pointer;background:var(--acc);color:#1a1405}
 .btn.alt{background:#2b303b;color:var(--text)}
@@ -70,8 +72,8 @@ details{margin-top:14px}summary{cursor:pointer;color:var(--acc);font-size:14px;p
    <label for="zoom">Zoom: <span id="zv">100</span>%</label>
    <input type="range" id="zoom" min="20" max="500" value="100">
    <button class="btn alt" id="rst" type="button" style="width:100%;margin-top:10px">Reset position</button>
-   <div class="row"><div><label for="fh">Frame height</label><input type="range" id="fh" min="15" max="75" value="46"></div><div><label for="rad">Corner roundness</label><input type="range" id="rad" min="0" max="80" value="28"></div></div>
-   <p class="hint">Tap the dashed area on the preview to add a photo. One finger moves it, two fingers pinch to zoom (mouse: drag and wheel). Without a photo the frame is left out of the download.</p>
+   <div class="row"><div><label for="fh">Frame height</label><input type="range" id="fh" min="2" max="95" step="any" value="46"></div><div><label for="rad">Corner roundness</label><input type="range" id="rad" min="0" max="80" value="28"></div></div>
+   <p class="hint">Tap the dashed area on the preview to add a photo. One finger moves it, two fingers pinch to zoom (mouse: drag and wheel). Without a photo the frame is left out of the download. Drag the yellow bar on the bottom edge of the image up or down to make the image bigger or smaller, as small or as big as you like: the post text shrinks or grows by itself.</p>
   </div>
 
   <div class="card">
@@ -115,7 +117,7 @@ details{margin-top:14px}summary{cursor:pointer;color:var(--acc);font-size:14px;p
  </div>
 
  <div class="preview">
-  <div class="stage"><canvas id="cv" width="1080" height="1350"></canvas><div id="hit" aria-label="Image area"></div></div>
+  <div class="stage"><canvas id="cv" width="1080" height="1350"></canvas><div id="hit" aria-label="Image area"></div><div id="rz" aria-label="Drag to resize image frame" title="Drag up or down"><span></span></div></div>
   <div class="btns">
    <button class="btn" id="dpng">Download PNG</button>
    <button class="btn alt" id="djpg">Download JPG</button>
@@ -217,7 +219,7 @@ const cv=$('cv'),ctx=cv.getContext('2d');
 /* ---- Android app (Capacitor) helpers: harmless in a normal browser ---- */
 const NATIVE=!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform());
 const PL=n=>(window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins[n])||null;
-const DEF={};['raw','imgp','title','post','handle','zoom','fh','rad','hs','align','size','font','scale'].forEach(id=>{DEF[id]=$(id).value});
+const DEF={};['raw','imgp','title','post','handle','zoom','fh','rad','hs','align','size','font','scale','pscale'].forEach(id=>{DEF[id]=$(id).value});
 function openExt(u){const B=NATIVE&&PL('Browser');if(B)B.open({url:u});else window.open(u,'_blank')}
 async function shareFile(data,name,title,enc){
  try{
@@ -306,16 +308,19 @@ function draw(exp){
  };
  const pm=$('pscale').value/100,k=W/1080;
  const psTarget=Math.round(52*pm*k),psCap=Math.round(78*pm*k),tsCap=Math.round(170*m*k);
+ const minTs=Math.max(14,Math.round(26*m*k)),minPs=Math.max(12,Math.round(22*pm*k));
  const solve=()=>{
   fh=hasFrame?Math.round(H*fhPct/100):0;extra=hasFrame?fh+fgap*1.5:0;availT=avail-extra;
   let l;
-  for(let ts=tsCap;ts>=30;ts-=3){
-   const ps=Math.max(28,Math.min(psCap,ts*0.68));
+  for(let ts=tsCap;ts>=minTs;ts-=3){
+   const ps=Math.max(minPs,Math.min(psCap,ts*0.68));
    l=lay(ts,ps);if(l.total<=availT){l.fits=true;return l}
   }
-  l.fits=false;return l;
+  l=lay(minTs,minPs);l.fits=l.total<=availT;return l;
  };
  let fhPct=+$('fh').value;
+ if(hasFrame){const maxPct=Math.max(2,Math.min(95,(avail-lay(minTs,minPs).total-fgap*1.5)/H*100));
+  if(fhPct>maxPct){fhPct=maxPct;if(!exp)$('fh').value=fhPct}}
  const minPct=($('auto').checked&&hasFrame)?Math.min(fhPct,24):fhPct;
  let L=solve();
  while(fhPct>minPct&&(!L.fits||L.ps<psTarget)){fhPct=Math.max(minPct,fhPct-2);L=solve()}
@@ -350,7 +355,9 @@ function draw(exp){
  if($('bord').checked){const lw=Math.max(2,Math.round(W/270));ctx.strokeStyle='rgba(128,128,128,0.35)';ctx.lineWidth=lw;ctx.strokeRect(lw/2,lw/2,W-lw,H-lw)}
  if(!exp){const h=$('hit');
   if(fr){h.style.display='block';h.style.left=fr.x/W*100+'%';h.style.top=fr.y/H*100+'%';h.style.width=fr.w/W*100+'%';h.style.height=fr.h/H*100+'%'}
-  else h.style.display='none'}
+  else h.style.display='none';
+  const z=$('rz');
+  if(fr){z.style.display='flex';z.style.top=(fr.y+fr.h)/H*100+'%'}else z.style.display='none'}
 }
 function dl(type,ext){
  if(NATIVE&&PL('Filesystem')&&PL('Share')){
@@ -388,6 +395,22 @@ $('addimg').onclick=()=>$('file').click();
 $('rst').onclick=()=>{zm=1;px=0;py=0;draw()};
 $('rmimg').onclick=()=>{im=null;zm=1;px=0;py=0;draw()};
 $('zoom').addEventListener('input',e=>{zm=e.target.value/100;draw()});
+const rzEl=$('rz');let rzOff=null;
+rzEl.addEventListener('pointerdown',e=>{if(!fr)return;rzEl.setPointerCapture(e.pointerId);
+ if($('auto').checked){$('auto').checked=false;toast('Auto-shrink is off now, so your frame size stays as you set it. Tick it again to turn it back on.')}
+ const r=cv.getBoundingClientRect();rzOff=(e.clientY-r.top)*cs()-(fr.y+fr.h);e.preventDefault()});
+rzEl.addEventListener('pointermove',e=>{
+ if(rzOff===null||!fr)return;
+ const r=cv.getBoundingClientRect(),H=cv.height,target=(e.clientY-r.top)*cs()-rzOff;
+ for(let i=0;i<4&&fr;i++){
+  const err=target-(fr.y+fr.h);if(Math.abs(err)<1.5)break;
+  const v=Math.min(95,Math.max(2,(fr.h+err)/H*100));
+  if(Math.abs(v-parseFloat($('fh').value))<0.01)break;
+  $('fh').value=v;draw();
+ }
+});
+const rzUp=()=>{rzOff=null};
+rzEl.addEventListener('pointerup',rzUp);rzEl.addEventListener('pointercancel',rzUp);
 const ls={g(k,d){try{const v=localStorage.getItem(k);return v===null?d:v}catch(e){return d}},s(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 const ORIG=$('origPrompt').textContent.replace(/^\n/,'').replace(/\n$/,'');
 $('ptpl').value=ls.g('fbpm_prompt',ORIG);
@@ -440,7 +463,7 @@ $('djpg').onclick=()=>dl('image/jpeg','jpg');
 function resetAll(){
  if(!confirm('Reset everything? Text, image and all settings will go back to default.'))return;
  Object.keys(DEF).forEach(id=>{$(id).value=DEF[id]});
- $('bul').checked=true;$('bord').checked=true;
+ $('bul').checked=true;$('bord').checked=true;$('auto').checked=true;
  im=null;zm=1;px=0;py=0;
  $('ref').value='';
  if(confirm('Also reset Page focus, Avoid topics list and your saved prompt to original?\n\nOK = reset them too\nCancel = keep them')){
