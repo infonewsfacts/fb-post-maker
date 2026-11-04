@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FB Post Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Poppins:wght@500;700&family=Montserrat:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#14161b;--panel:#1d2027;--line:#2d313b;--text:#eceef2;--mut:#9aa0ad;--acc:#f5b94a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:18px;display:grid;gap:18px;grid-template-columns:minmax(0,1fr) minmax(0,420px)}
+@media(max-width:820px){.wrap{grid-template-columns:1fr}.preview{order:-1;position:static!important}}
+h1{font-size:19px;margin:0 0 4px}
+.sub{color:var(--mut);font-size:13px;margin:0 0 14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
+label:first-child{margin-top:0}
+textarea,input[type=text],select{width:100%;background:#12141a;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:9px;font:inherit}
+textarea{resize:vertical;min-height:70px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.colors{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.colors input{width:100%;height:36px;border:1px solid var(--line);border-radius:6px;background:none;padding:2px}
+.themes{display:flex;flex-wrap:wrap;gap:8px}
+.themes button{width:44px;height:44px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0}
+.themes button:focus-visible,.btn:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+input[type=range]{width:100%}
+.preview{position:sticky;top:14px;align-self:start}
+canvas{width:100%;height:auto;display:block;border-radius:8px;border:1px solid var(--line);background:#000}
+.wrap2{max-width:1100px;margin:0 auto;padding:0 18px 40px}
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:520px){.three{grid-template-columns:1fr}}
+details{margin-top:14px}summary{cursor:pointer;color:var(--acc);font-size:14px;padding:6px 0}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:90%;background:#f1f3f7;color:#14161b;padding:10px 14px;border-radius:8px;font-size:13px;display:none;z-index:9}
+.stage{position:relative}
+#hit{position:absolute;touch-action:none;cursor:grab;display:none}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.btn{border:0;border-radius:8px;padding:12px;font:inherit;font-weight:600;cursor:pointer;background:var(--acc);color:#1a1405}
+.btn.alt{background:#2b303b;color:var(--text)}
+.chk{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text);margin-top:10px}
+.hint{font-size:12px;color:var(--mut);margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div>
+  <h1>Facebook Post Image Maker</h1>
+  <p class="sub">Paste the full AI output (Title: and Post:). Words inside *stars* get highlighted.</p>
+
+  <div class="card">
+   <label for="raw">Paste AI output</label>
+   <textarea id="raw" rows="5" placeholder="Title: ...&#10;Post: ..."></textarea>
+   <button class="btn alt" id="pastebtn" type="button" style="width:100%;margin-top:8px">Paste from clipboard</button>
+   <label for="imgp">Image prompt for Gemini (picked up from the AI reply)</label>
+   <textarea id="imgp" rows="3"></textarea>
+   <div class="row" style="margin-top:8px"><button class="btn alt" id="cpimg" type="button">Copy image prompt</button><button class="btn alt" id="gemimg" type="button">Copy + open Gemini</button></div>
+   <label for="title">Title (image headline)</label>
+   <input type="text" id="title" value="You are not *too much*, you are with the wrong audience">
+   <label for="post">Post (image body, one line per point for a list)</label>
+   <textarea id="post" rows="4">Someone who loves your depth will never call it drama. Notice who relaxes around your honesty, and who gets defensive.</textarea>
+   <label for="handle">Page name / footer (optional)</label>
+   <input type="text" id="handle" placeholder="Your Page Name">
+  </div>
+
+  <div class="card">
+   <label>Image (between title and post)</label>
+   <input type="file" id="file" accept="image/*" hidden>
+   <div class="row"><button class="btn" id="addimg" type="button">Add / change image</button><button class="btn alt" id="rmimg" type="button">Remove image</button></div>
+   <label for="zoom">Zoom: <span id="zv">100</span>%</label>
+   <input type="range" id="zoom" min="20" max="500" value="100">
+   <button class="btn alt" id="rst" type="button" style="width:100%;margin-top:10px">Reset position</button>
+   <div class="row"><div><label for="fh">Frame height</label><input type="range" id="fh" min="15" max="75" value="46"></div><div><label for="rad">Corner roundness</label><input type="range" id="rad" min="0" max="80" value="28"></div></div>
+   <p class="hint">Tap the dashed area on the preview to add a photo. One finger moves it, two fingers pinch to zoom (mouse: drag and wheel). Without a photo the frame is left out of the download.</p>
+  </div>
+
+  <div class="card">
+   <label>Theme</label>
+   <div class="themes" id="themes"></div>
+   <label>Colors: background 1, background 2, text, highlight</label>
+   <div class="colors">
+    <input type="color" id="b1" aria-label="Background 1">
+    <input type="color" id="b2" aria-label="Background 2">
+    <input type="color" id="tc" aria-label="Text color">
+    <input type="color" id="hc" aria-label="Highlight color">
+   </div>
+   <div class="row">
+    <div><label for="hs">Highlight style</label>
+     <select id="hs"><option value="color">Colored text</option><option value="marker">Marker box</option></select></div>
+    <div><label for="align">Alignment</label>
+     <select id="align"><option value="left">Left</option><option value="center">Center</option></select></div>
+   </div>
+  </div>
+
+  <div class="card">
+   <div class="row">
+    <div><label for="size">Image size</label>
+     <select id="size"><option value="1080x1350">4:5 portrait (1080x1350)</option><option value="1080x1080">Square (1080x1080)</option><option value="1200x630">Link style (1200x630)</option></select></div>
+    <div><label for="font">Font</label>
+     <select id="font">
+      <option value='Roboto,Calibri,Carlito,"Segoe UI",Arial,sans-serif'>Roboto</option>
+      <option value='Calibri,Carlito,Roboto,"Segoe UI",Arial,sans-serif'>Calibri style</option>
+      <option value='"Poppins","Segoe UI",Arial,sans-serif'>Poppins</option>
+      <option value='"Montserrat","Segoe UI",Arial,sans-serif'>Montserrat</option>
+     </select></div>
+   </div>
+   <label for="scale">Text size: <span id="sv">100</span>%</label>
+   <input type="range" id="scale" min="60" max="160" value="100">
+   <label class="chk"><input type="checkbox" id="bul" checked> Show dots when body has 3+ lines</label>
+   <label class="chk"><input type="checkbox" id="bord" checked> Light border around the image</label>
+  </div>
+ </div>
+
+ <div class="preview">
+  <div class="stage"><canvas id="cv" width="1080" height="1350"></canvas><div id="hit" aria-label="Image area"></div></div>
+  <div class="btns">
+   <button class="btn" id="dpng">Download PNG</button>
+   <button class="btn alt" id="djpg">Download JPG</button>
+  </div>
+  <p class="hint">Text auto-fits the image. Edit fields on the left to see changes live.</p>
+ </div>
+</div>
+
+<div class="wrap2">
+ <div class="card">
+  <h1>AI prompt sender</h1>
+  <p class="sub">Your content prompt is saved inside this file. Fill the boxes, pick an app, and it opens with the prompt ready.</p>
+  <label for="pfocus">Page focus</label>
+  <input type="text" id="pfocus">
+  <label for="ref">Reference text (optional): paste a Pinterest or Facebook post, or leave empty for a fresh topic</label>
+  <textarea id="ref" rows="4"></textarea>
+  <label for="avoid">Avoid topics (recent titles, one per line; new titles are added automatically)</label>
+  <textarea id="avoid" rows="3"></textarea>
+  <div class="three" style="margin-top:12px">
+   <button class="btn" id="sgpt" type="button">Send to ChatGPT</button>
+   <button class="btn" id="sclaude" type="button">Send to Claude</button>
+   <button class="btn" id="sgem" type="button">Send to Gemini</button>
+  </div>
+  <button class="btn alt" id="cpall" type="button" style="width:100%;margin-top:10px">Copy full prompt only</button>
+  <p class="hint">The full prompt is copied first, then the app opens. If its message box is empty, just paste. Then copy the AI reply and use "Paste from clipboard" in the image maker above.</p>
+  <details>
+   <summary>My saved prompt (tap to open)</summary>
+   <textarea id="ptpl" rows="16" style="margin-top:8px"></textarea>
+   <div class="three" style="margin-top:10px">
+    <button class="btn alt" id="cptpl" type="button">Copy template</button>
+    <button class="btn alt" id="dltpl" type="button">Download .txt</button>
+    <button class="btn alt" id="rstpl" type="button">Reset to original</button>
+   </div>
+   <p class="hint">Edits are saved on this device. The original prompt always stays inside the HTML file.</p>
+  </details>
+ </div>
+</div>
+<div id="toast" role="status"></div>
+<script type="text/plain" id="origPrompt">
+You are the head content strategist for a Facebook page in the psychology, relationships and dating niche. Audience: English-speaking adults 18-35.
+
+PAGE FOCUS (edit per page): psychology of relationships and dating
+AVOID TOPICS (optional, paste recent titles): none
+
+GOAL: Create ONE image post built to grow the page. The reader should stop scrolling, think "this is exactly me" or "this is exactly my friend", send it to that person, and save one line or step to use later. Facebook rewards original content that earns shares, saves and real comments, and people follow pages that make them feel understood.
+
+INPUT: I will paste text from a Pinterest pin or Facebook post as REFERENCE. If no reference is given, choose a fresh, relatable topic yourself within the PAGE FOCUS (attachment, boundaries, communication, self-worth, conflict, texting, situationships, healing, dating habits, etc.). Never pick a topic listed in AVOID TOPICS, and vary the topic every time.
+
+PROCESS (do this silently, never show it):
+1. From the reference, extract only the core topic, the underlying psychological idea, and why people relate to it. Do NOT reuse its wording, sentence patterns, examples or order.
+2. Find a specific moment people recognise (a delayed reply, a 2am overthink, an argument over something small). Specific beats general. Let the reader picture a real person (a friend, an ex, a partner) without naming anyone.
+3. Pick the single best format from: Short statement, Signs list, Myth vs fact, Say this not that, Psychology term. Never show the format name.
+4. Write 3 drafts silently. Score each from 1 to 5 on: hook strength, specificity, send-to-a-friend urge, save-worthy usefulness, psychological accuracy. Rewrite until the best draft scores 4 or more on all five, then output only that one.
+
+RULES:
+- Title (image headline): max 10 words, ideally 6-8. A scroll-stopping hook using contrast, curiosity, or a truth people feel but rarely say. Wrap 1-3 key words in *single stars* for highlighting. Never use ** bold.
+- Post (image body): max 35 words, ideally 20-30. Simple English, short sentences, easy to read on a phone screen.
+- It must contain one useful insight, line or step the reader can use in a real conversation or situation, not just emotion.
+- Tone: calm, wise, supportive, like a smart friend. Never preachy, dramatic, clinical or guru-like.
+- Accuracy: use only real, well-established psychology ideas. No invented studies, statistics or percentages. Never diagnose or label people with disorders. Avoid absolutes like always, never, everyone unless truly universal.
+- Inclusive: gender-neutral wording, use "partner" not boyfriend/girlfriend, must fit any relationship type.
+- Avoid clichés: You deserve, healing isn't linear, Let that sink in, Read that again, Remember:, and overused words like toxic or narcissist.
+- No emojis, no hashtags, no caption, no CTA, and no asking for likes, comments or shares (Facebook demotes engagement bait).
+
+FORMAT RULES:
+- Signs list: Post = 4-5 lines, one point per line, max 8 words each.
+- Myth vs fact: Title = the myth, Post = the fact.
+- Say this not that: Title = what NOT to say, Post = what to say instead.
+- Psychology term: Title = the term, Post = its simple meaning plus how it shows up in real life.
+- Short statement: Title = the statement, Post = 1-2 supporting sentences.
+
+HIGHLIGHT RULES (my image maker colors starred words automatically and hides the stars, so follow these exactly):
+- The Title must always have 1-3 main keywords or focus words wrapped in *single stars*. The Post may have 0-2 starred words.
+- Put stars only around words, never around a full sentence, and never include a comma, full stop or other punctuation inside the stars.
+- Use the star character only for highlighting. Never use it for bullets, bold or anything else.
+
+OUTPUT FORMAT (follow exactly, I will copy each block separately). Output exactly two code blocks and nothing else: no intro, no notes, no scores, no format name.
+
+Block 1: one plain-text code block containing only:
+Title: <the title>
+Post: <the post>
+- For a Signs list, put each point on its own line under Post:, with no bullets, dashes or numbers.
+- No quotation marks, markdown, emojis or hashtags inside the block.
+
+Block 2: a separate code block containing ONE image-generation prompt for Google Gemini, written as a single paragraph, ready to paste, with no labels or headings. Follow the IMAGE STYLE rules below.
+
+IMAGE STYLE (for Block 2):
+- Style: American webtoon / Western comic semi-realistic illustration (not manga, not Korean webtoon). Clean linework, soft cel-shading, polished modern comic-book look. Warm, intimate lighting that softens skin tones and sets a calm emotional mood.
+- Aspect ratio: square 1:1.
+- Scene: show the specific moment from the Title and Post (for example someone staring at a phone at night). Adults of any gender, fitting any relationship type, natural body proportions, everyday modest clothing, expressive faces and body language that carry the emotion.
+- Composition: keep the main subject centred with breathing room around the edges, because the image will later be cropped into a wide frame.
+- The image must contain no text, letters, numbers, logos, watermarks, speech bubbles or captions. Nothing sexualised.
+- If I say I will attach a reference image, begin the image prompt with: "Same people and same setting. Keep the exact same pose, do not change it." and then restyle it as above.
+</script>
+<script>
+const $=id=>document.getElementById(id);
+const cv=$('cv'),ctx=cv.getContext('2d');
+/* ---- Android app (Capacitor) helpers: harmless in a normal browser ---- */
+const NATIVE=!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform());
+const PL=n=>(window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins[n])||null;
+function openExt(u){const B=NATIVE&&PL('Browser');if(B)B.open({url:u});else window.open(u,'_blank')}
+async function shareFile(data,name,title,enc){
+ try{
+  const o={path:name,data:data,directory:'CACHE'};if(enc)o.encoding=enc;
+  const r=await PL('Filesystem').writeFile(o);
+  await PL('Share').share({title:title,dialogTitle:title,files:[r.uri]});
+ }catch(e){const m=String((e&&e.message)||e);if(!/cancel/i.test(m))toast('Could not save: '+m)}
+}
+let im=null,zm=1,px=0,py=0,fr=null;
+const THEMES=[
+ {n:'White',b1:'#ffffff',b2:'#ffffff',t:'#000000',h:'#e11d2e'},
+ {n:'Midnight',b1:'#0f172a',b2:'#1e293b',t:'#f8fafc',h:'#fbbf24'},
+ {n:'Cream',b1:'#fbf3e6',b2:'#f3e2c7',t:'#2b2118',h:'#e4572e'},
+ {n:'Rose',b1:'#4a1d2e',b2:'#7a2e47',t:'#fff1f2',h:'#fda4af'},
+ {n:'Sage',b1:'#e6eee3',b2:'#cddcc8',t:'#1f2f23',h:'#2f7d4f'},
+ {n:'Violet',b1:'#2e1065',b2:'#581c87',t:'#faf5ff',h:'#f0abfc'},
+ {n:'Noir',b1:'#000000',b2:'#1c1c20',t:'#ffffff',h:'#f43f5e'}
+];
+function applyTheme(t){$('b1').value=t.b1;$('b2').value=t.b2;$('tc').value=t.t;$('hc').value=t.h;draw()}
+THEMES.forEach(t=>{const b=document.createElement('button');b.title=t.n;b.setAttribute('aria-label',t.n+' theme');
+ b.style.background=`linear-gradient(135deg,${t.b1} 50%,${t.h} 50%)`;b.onclick=()=>applyTheme(t);$('themes').appendChild(b)});
+
+function addAvoid(t){
+ if(!t)return;
+ const a=$('avoid').value.split('\n').map(x=>x.trim()).filter(Boolean);
+ if(!a.includes(t))a.push(t);
+ $('avoid').value=a.slice(-20).join('\n');ls.s('fbpm_avoid',$('avoid').value);
+}
+function parseRaw(s){
+ s=s.replace(/\*\*/g,'*');
+ const blocks=[...s.matchAll(/```[^\n]*\n?([\s\S]*?)```/g)].map(m=>m[1].trim());
+ let main=s,img='';
+ if(blocks.length){const i=blocks.findIndex(b=>/title\s*:/i.test(b));
+  if(i>=0){main=blocks[i];img=blocks.find((b,j)=>j!==i)||''}else main=blocks[0]}
+ const m=main.match(/title\s*:\s*([\s\S]*?)\n?\s*post\s*:\s*([\s\S]*)/i);
+ if(m){$('title').value=m[1].trim();$('post').value=m[2].trim()}
+ else{const p=main.trim().split(/\n\s*\n/);if(p.length>=2){$('title').value=p[0].trim();$('post').value=p.slice(1).join('\n').trim()}}
+ if(img)$('imgp').value=img;
+ if(m)addAvoid($('title').value.replace(/\*/g,'').trim());
+}
+function toks(s){
+ const out=[];s.replace(/\*\*/g,'*').split('*').forEach((part,i)=>{
+  part.split(/\s+/).filter(Boolean).forEach(w=>out.push({w,hl:i%2===1}))});
+ return out;
+}
+function wrap(words,maxW){
+ const sp=ctx.measureText(' ').width,lines=[];let cur=[],cw=0;
+ words.forEach(o=>{const w=ctx.measureText(o.w).width,item={...o,width:w};
+  if(cur.length&&cw+sp+w>maxW){lines.push({words:cur,width:cw});cur=[item];cw=w}
+  else{cw+=(cur.length?sp:0)+w;cur.push(item)}});
+ if(cur.length)lines.push({words:cur,width:cw});
+ return lines;
+}
+function drawLine(line,x0,cy,fs,color,marker,hc,mtext){
+ const sp=ctx.measureText(' ').width;let x=x0;
+ line.words.forEach(o=>{
+  if(o.hl&&marker){ctx.fillStyle=hc;const pad=fs*0.12,h=fs*1.08;
+   ctx.beginPath();(ctx.roundRect||ctx.rect).call(ctx,x-pad,cy-h/2,o.width+pad*2,h,fs*0.12);ctx.fill();ctx.fillStyle=mtext}
+  else ctx.fillStyle=o.hl?hc:color;
+  ctx.fillText(o.w,x,cy);x+=o.width+sp});
+}
+function draw(exp){
+ const [W,H]=$('size').value.split('x').map(Number);cv.width=W;cv.height=H;
+ const b1=$('b1').value,b2=$('b2').value,tc=$('tc').value,hc=$('hc').value;
+ const marker=$('hs').value==='marker',font=$('font').value,m=$('scale').value/100;
+ $('sv').textContent=$('scale').value;$('zv').textContent=Math.round(zm*100);$('zoom').value=Math.round(zm*100);
+ const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,b1);g.addColorStop(1,b2);
+ ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ const handle=$('handle').value.trim(),pad=Math.round(Math.min(W,H)*0.05);
+ const footer=handle?Math.round(H*0.06):0,avail=H-2*pad-footer;
+ const hasFrame=!!im||!exp,fgap=Math.round(H*0.025),fh=hasFrame?Math.round(H*$('fh').value/100):0;
+ const extra=hasFrame?fh+fgap*1.5:0,availT=avail-extra;
+ const pl=$('post').value.split('\n').map(s=>s.trim()).filter(Boolean);
+ const bullets=$('bul').checked&&pl.length>=3;
+ const align=bullets?'left':$('align').value;
+ const tw=toks($('title').value);
+ ctx.textBaseline='middle';ctx.textAlign='left';
+ const lay=(ts,ps)=>{
+  const ind=bullets?ps*0.9:0;
+  ctx.font=`700 ${ts}px ${font}`;const tl=wrap(tw,W-2*pad),tlh=ts*1.2;
+  ctx.font=`500 ${ps}px ${font}`;
+  const paras=pl.map(p=>wrap(toks(p),W-2*pad-ind)),plh=ps*1.45,gap=ps*(bullets?0.55:0.4);
+  let ph=0;paras.forEach(a=>ph+=a.length*plh);ph+=gap*Math.max(0,paras.length-1);
+  const mid=ts*0.55;
+  return{tl,tlh,paras,plh,gap,ind,mid,total:tl.length*tlh+mid+ph,ts,ps};
+ };
+ let L;
+ for(let ts=Math.round(190*m);ts>=30;ts-=3){
+  const ps=Math.max(30,Math.min(88*m,ts*0.62));
+  L=lay(ts,ps);if(L.total<=availT)break;
+ }
+ let y=pad+(avail-L.total-extra)/2;
+ const place=(w)=>align==='center'?(W-w)/2:pad;
+ ctx.font=`700 ${L.ts}px ${font}`;
+ L.tl.forEach(l=>{drawLine(l,place(l.width),y+L.tlh/2,L.ts,tc,marker,hc,b1);y+=L.tlh});
+ const barW=Math.round(L.ts*1.3),barH=Math.max(6,Math.round(L.ts*0.07));
+ ctx.fillStyle=hc;ctx.fillRect(align==='center'?(W-barW)/2:pad,y+L.mid/2-barH/2,barW,barH);
+ y+=L.mid;
+ if(hasFrame){
+  const fx=pad,fw=W-2*pad,r=$('rad').value*W/1080;
+  const path=()=>{ctx.beginPath();(ctx.roundRect||ctx.rect).call(ctx,fx,y,fw,fh,r)};
+  fr={x:fx,y:y,w:fw,h:fh};
+  ctx.save();path();ctx.clip();
+  ctx.fillStyle='rgba(128,128,128,0.18)';ctx.fillRect(fx,y,fw,fh);
+  if(im){const base=Math.max(fw/im.width,fh/im.height)*zm,dw=im.width*base,dh=im.height*base;
+   ctx.drawImage(im,fx+fw/2+px*fw-dw/2,y+fh/2+py*fh-dh/2,dw,dh)}
+  ctx.restore();
+  if(!im){ctx.save();path();ctx.setLineDash([14,10]);ctx.lineWidth=3;ctx.strokeStyle=tc;ctx.globalAlpha=0.5;ctx.stroke();
+   ctx.globalAlpha=0.75;ctx.fillStyle=tc;ctx.textAlign='center';ctx.font=`500 ${Math.round(W*0.032)}px ${font}`;
+   ctx.fillText('Tap to add image',fx+fw/2,y+fh/2);ctx.restore()}
+  y+=fh+fgap*1.5;
+ }else fr=null;
+ ctx.font=`500 ${L.ps}px ${font}`;
+ L.paras.forEach((lines,i)=>{
+  if(bullets){ctx.fillStyle=hc;ctx.beginPath();ctx.arc(pad+L.ps*0.18,y+L.plh/2,L.ps*0.14,0,7);ctx.fill()}
+  lines.forEach(l=>{drawLine(l,bullets?pad+L.ind:place(l.width),y+L.plh/2,L.ps,tc,false,tc,tc);y+=L.plh});
+  y+=L.gap});
+ if(handle){ctx.font=`700 ${Math.round(H*0.022)}px ${font}`;ctx.fillStyle=tc;ctx.globalAlpha=0.7;
+  const w=ctx.measureText(handle).width;ctx.fillText(handle,(W-w)/2,H-pad*0.75);ctx.globalAlpha=1}
+ if($('bord').checked){const lw=Math.max(2,Math.round(W/270));ctx.strokeStyle='rgba(128,128,128,0.35)';ctx.lineWidth=lw;ctx.strokeRect(lw/2,lw/2,W-lw,H-lw)}
+ if(!exp){const h=$('hit');
+  if(fr){h.style.display='block';h.style.left=fr.x/W*100+'%';h.style.top=fr.y/H*100+'%';h.style.width=fr.w/W*100+'%';h.style.height=fr.h/H*100+'%'}
+  else h.style.display='none'}
+}
+function dl(type,ext){
+ if(NATIVE&&PL('Filesystem')&&PL('Share')){
+  draw(true);const data=cv.toDataURL(type,0.95).split(',')[1];draw();
+  shareFile(data,'fb-post-'+Date.now()+'.'+ext,'Save or share image');return;
+ }
+ draw(true);
+ cv.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='fb-post.'+ext;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)},type,0.95);
+ draw();
+}
+$('raw').addEventListener('input',e=>{parseRaw(e.target.value);draw()});
+['title','post','handle','b1','b2','tc','hc','hs','align','size','font','scale','bul','bord','fh','rad'].forEach(id=>$(id).addEventListener('input',draw));
+const hitEl=$('hit'),pts=new Map();let tap=null,lastD=0;
+const cs=()=>cv.width/cv.getBoundingClientRect().width;
+const dist=()=>{const a=[...pts.values()];return Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)};
+function setZoom(z){zm=Math.min(5,Math.max(0.2,z));draw()}
+hitEl.addEventListener('pointerdown',e=>{hitEl.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(pts.size===1)tap={t:Date.now(),x:e.clientX,y:e.clientY,moved:false};else{tap=null;lastD=dist()}});
+hitEl.addEventListener('pointermove',e=>{
+ const p=pts.get(e.pointerId);if(!p||!im||!fr)return;
+ if(pts.size===1){const dx=e.clientX-p.x,dy=e.clientY-p.y;
+  if(tap&&Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>6)tap.moved=true;
+  p.x=e.clientX;p.y=e.clientY;
+  px=Math.max(-0.5,Math.min(0.5,px+dx*cs()/fr.w));py=Math.max(-0.5,Math.min(0.5,py+dy*cs()/fr.h));draw()}
+ else if(pts.size===2){p.x=e.clientX;p.y=e.clientY;const d=dist();if(lastD)setZoom(zm*d/lastD);lastD=d}
+});
+const up=e=>{pts.delete(e.pointerId);lastD=0;
+ if(e.type==='pointerup'&&tap&&!tap.moved&&Date.now()-tap.t<500&&!im)$('file').click();
+ if(!pts.size)tap=null};
+hitEl.addEventListener('pointerup',up);hitEl.addEventListener('pointercancel',up);
+hitEl.addEventListener('wheel',e=>{if(!im)return;e.preventDefault();setZoom(zm*(e.deltaY<0?1.08:0.92))},{passive:false});
+$('file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;
+ const i=new Image();i.onload=()=>{im=i;zm=1;px=0;py=0;draw()};i.src=URL.createObjectURL(f);e.target.value=''});
+$('addimg').onclick=()=>$('file').click();
+$('rst').onclick=()=>{zm=1;px=0;py=0;draw()};
+$('rmimg').onclick=()=>{im=null;zm=1;px=0;py=0;draw()};
+$('zoom').addEventListener('input',e=>{zm=e.target.value/100;draw()});
+const ls={g(k,d){try{const v=localStorage.getItem(k);return v===null?d:v}catch(e){return d}},s(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const ORIG=$('origPrompt').textContent.replace(/^\n/,'').replace(/\n$/,'');
+$('ptpl').value=ls.g('fbpm_prompt',ORIG);
+$('pfocus').value=ls.g('fbpm_focus','psychology of relationships and dating');
+$('avoid').value=ls.g('fbpm_avoid','');
+$('ptpl').addEventListener('input',()=>ls.s('fbpm_prompt',$('ptpl').value));
+$('pfocus').addEventListener('input',()=>ls.s('fbpm_focus',$('pfocus').value));
+$('avoid').addEventListener('input',()=>ls.s('fbpm_avoid',$('avoid').value));
+let toastT;
+function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>{t.style.display='none'},4000)}
+function copyText(t){
+ if(NATIVE&&PL('Clipboard')){PL('Clipboard').write({string:t}).catch(()=>{});return true}
+ let ok=false;
+ try{const a=document.createElement('textarea');a.value=t;a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();a.setSelectionRange(0,t.length);ok=document.execCommand('copy');a.remove()}catch(e){}
+ if(!ok&&navigator.clipboard)navigator.clipboard.writeText(t).then(()=>{ok=true}).catch(()=>{});
+ return ok||!!navigator.clipboard;
+}
+function buildPrompt(){
+ const focus=$('pfocus').value.trim()||'psychology of relationships and dating';
+ const avoid=$('avoid').value.split('\n').map(x=>x.trim()).filter(Boolean).join(' | ')||'none';
+ let p=$('ptpl').value;
+ p=p.replace(/^PAGE FOCUS.*$/m,()=>'PAGE FOCUS (edit per page): '+focus).replace(/^AVOID TOPICS.*$/m,()=>'AVOID TOPICS (optional, paste recent titles): '+avoid);
+ const ref=$('ref').value.trim();
+ return p+'\n\n'+(ref?'REFERENCE:\n'+ref:'No reference given. Choose a fresh topic yourself.');
+}
+const APPS={chatgpt:{n:'ChatGPT',u:'https://chatgpt.com/',q:'https://chatgpt.com/?q='},claude:{n:'Claude',u:'https://claude.ai/new',q:'https://claude.ai/new?q='},gemini:{n:'Gemini',u:'https://gemini.google.com/app'}};
+function send(k){
+ const p=buildPrompt(),a=APPS[k],copied=copyText(p);
+ let url=a.u;
+ if(a.q){const e=a.q+encodeURIComponent(p);if(e.length<=7500)url=e}
+ openExt(url);
+ toast((copied?'Prompt copied. ':'Copy may have failed, use "Copy full prompt only". ')+'Opening '+a.n+'. If its message box is empty, paste.');
+}
+$('sgpt').onclick=()=>send('chatgpt');
+$('sclaude').onclick=()=>send('claude');
+$('sgem').onclick=()=>send('gemini');
+$('cpall').onclick=()=>{toast(copyText(buildPrompt())?'Full prompt copied.':'Copy failed. Select the text manually.')};
+$('cptpl').onclick=()=>{toast(copyText($('ptpl').value)?'Template copied.':'Copy failed.')};
+$('dltpl').onclick=()=>{if(NATIVE&&PL('Filesystem')&&PL('Share')){shareFile($('ptpl').value,'fb-content-prompt.txt','Save or share prompt','utf8');return}const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([$('ptpl').value],{type:'text/plain'}));a.download='fb-content-prompt.txt';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+$('rstpl').onclick=()=>{if(confirm('Replace your edited prompt with the original saved in this file?')){$('ptpl').value=ORIG;ls.s('fbpm_prompt',ORIG);toast('Original prompt restored.')}};
+$('pastebtn').onclick=()=>{
+ if(NATIVE&&PL('Clipboard')){PL('Clipboard').read().then(r=>{const t=r.value||'';$('raw').value=t;parseRaw(t);draw()}).catch(()=>toast('Clipboard blocked, paste into the box manually.'));return}
+ if(!navigator.clipboard||!navigator.clipboard.readText){toast('Clipboard paste not available, paste into the box manually.');return}
+ navigator.clipboard.readText().then(t=>{$('raw').value=t;parseRaw(t);draw()}).catch(()=>toast('Clipboard blocked, paste into the box manually.'));
+};
+$('cpimg').onclick=()=>{toast(copyText($('imgp').value)?'Image prompt copied.':'Copy failed.')};
+$('gemimg').onclick=()=>{const c=copyText($('imgp').value);openExt(APPS.gemini.u);toast((c?'Image prompt copied. ':'')+'Opening Gemini. Paste it there.')};
+$('dpng').onclick=()=>dl('image/png','png');
+$('djpg').onclick=()=>dl('image/jpeg','jpg');
+applyTheme(THEMES[0]);
+if(document.fonts){['700 40px Roboto','500 40px Roboto','700 40px Poppins','500 40px Poppins','700 40px Montserrat','500 40px Montserrat'].forEach(f=>document.fonts.load(f).then(draw).catch(()=>{}))}
+</script>
+</body>
+</html>
